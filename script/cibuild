@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+TOP_LEVEL="$(cd "$HERE/../" && pwd)"
+
+cd "$TOP_LEVEL"
+
+# Test
+swift test
+
+# Build
+./script/build
+
+# Deploy
+rm -rf deploy
+mkdir -p deploy
+( cd .build/release && zip -r "${TOP_LEVEL}/deploy/Coffee.zip" Coffee.app )

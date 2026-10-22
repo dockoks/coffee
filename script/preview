@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+# Renders the menu bar cup animations to .build/preview/ (animated GIFs, contact sheets and an
+# index.html) and opens the page, using the app's own drawing code. No need to run the app.
+#
+#   ./script/preview            render and open
+#   NO_OPEN=1 ./script/preview  render only
+
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+TOP_LEVEL="$(cd "$HERE/../" && pwd)"
+
+cd "$TOP_LEVEL"
+
+OUT=".build/preview"
+mkdir -p "$OUT"
+
+swiftc -O Tools/Preview/main.swift \
+    Sources/Coffee/CupIcon.swift Sources/Coffee/CupTransition.swift \
+    Sources/Coffee/CupAnimation.swift Sources/Coffee/SVGPath.swift \
+    Sources/Coffee/PathTrim.swift \
+    -o "$OUT/preview"
+
+"$OUT/preview" "$OUT"
+
+if [ -z "${NO_OPEN:-}" ]; then
+    open "$OUT/index.html"
+fi

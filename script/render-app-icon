@@ -1,0 +1,111 @@
+#!/usr/bin/env swift
+
+// Renders the app icon PNGs. Run from the repository root:
+//
+//   swift script/render-app-icon [OUTPUT_DIRECTORY]
+//
+// This draws a placeholder cup. Replace it with your own artwork (a 1024x1024 PNG) when you have it.
+
+import AppKit
+
+let outputDirectory =
+  CommandLine.arguments.count > 1
+  ? CommandLine.arguments[1] : "Sources/Coffee/Assets.xcassets/AppIcon.appiconset"
+
+// File name -> size in pixels. Every size is drawn from scratch so small ones stay crisp.
+let icons: [(name: String, pixels: Int)] = [
+  ("16x16", 16), ("16x16@2x", 32),
+  ("32x32", 32), ("32x32@2x", 64),
+  ("128x128", 128), ("128x128@2x", 256),
+  ("256x256", 256), ("256x256@2x", 512),
+  ("512x512", 512), ("512x512@2x", 1024),
+]
+
+func color(_ hex: UInt32, alpha: CGFloat = 1) -> NSColor {
+  NSColor(
+    srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
+    blue: CGFloat(hex & 0xFF) / 255, alpha: alpha)
+}
+
+let background = color(0xF5EBDD)
+let outline = color(0x4B3621)
+let coffee = color(0x6F4E37)
+let steam = color(0x4B3621, alpha: 0.6)
+
+// The cup is drawn in the menu bar icon's 18-unit space, then scaled onto the 1024 canvas.
+func drawCup() {
+  outline.set()
+  let wall = NSBezierPath()
+  wall.lineWidth = 1.5
+  wall.lineCapStyle = .butt
+  wall.move(to: NSPoint(x: 2.75, y: 11))
+  wall.line(to: NSPoint(x: 2.75, y: 3.75))
+  wall.curve(
+    to: NSPoint(x: 4.75, y: 1.75), controlPoint1: NSPoint(x: 2.75, y: 2.65),
+    controlPoint2: NSPoint(x: 3.65, y: 1.75))
+  wall.line(to: NSPoint(x: 10.25, y: 1.75))
+  wall.curve(
+    to: NSPoint(x: 12.25, y: 3.75), controlPoint1: NSPoint(x: 11.35, y: 1.75),
+    controlPoint2: NSPoint(x: 12.25, y: 2.65))
+  wall.line(to: NSPoint(x: 12.25, y: 11))
+  wall.stroke()
+
+  let handle = NSBezierPath()
+  handle.lineWidth = 1.5
+  handle.appendArc(withCenter: NSPoint(x: 13, y: 6.5), radius: 2.5, startAngle: -90, endAngle: 90)
+  handle.stroke()
+
+  coffee.set()
+  NSBezierPath(rect: NSRect(x: 4, y: 3, width: 7, height: 6.5)).fill()
+
+  steam.set()
+  for (index, centerX) in [4.5, 7.5, 10.5].enumerated() {
+    let wisp = NSBezierPath()
+    wisp.lineWidth = 1
+    wisp.lineCapStyle = .round
+    wisp.lineJoinStyle = .round
+    for step in 0...12 {
+      let t = Double(step) / 12
+      let point = NSPoint(
+        x: centerX + 0.8 * sin(2 * Double.pi * (t + Double(index) * 0.33)), y: 12.5 + 5 * t)
+      step == 0 ? wisp.move(to: point) : wisp.line(to: point)
+    }
+    wisp.stroke()
+  }
+}
+
+func render(pixels: Int) -> Data {
+  let rep = NSBitmapImageRep(
+    bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels, bitsPerSample: 8,
+    samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+    bytesPerRow: 0, bitsPerPixel: 0)!
+  rep.size = NSSize(width: pixels, height: pixels)
+
+  NSGraphicsContext.saveGraphicsState()
+  NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+
+  let canvas = NSAffineTransform()
+  canvas.scaleX(by: CGFloat(pixels) / 1024, yBy: CGFloat(pixels) / 1024)
+  canvas.concat()
+
+  background.set()
+  NSBezierPath(roundedRect: NSRect(x: 100, y: 100, width: 824, height: 824), xRadius: 185, yRadius: 185)
+    .fill()
+
+  // Center the cup (x 2...16.25, y 1...18 in its own space) on the canvas.
+  let k: CGFloat = 34
+  let cup = NSAffineTransform()
+  cup.translateX(by: 512 - 9.125 * k, yBy: 512 - 9.5 * k)
+  cup.scaleX(by: k, yBy: k)
+  cup.concat()
+  drawCup()
+
+  NSGraphicsContext.restoreGraphicsState()
+  return rep.representation(using: .png, properties: [:])!
+}
+
+for icon in icons {
+  let url = URL(fileURLWithPath: outputDirectory).appendingPathComponent("\(icon.name).png")
+  try render(pixels: icon.pixels).write(to: url)
+  print("wrote \(url.path) (\(icon.pixels)px)")
+}
