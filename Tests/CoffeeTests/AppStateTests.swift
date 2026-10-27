@@ -36,13 +36,22 @@ struct AppStateTests {
     var result = true
   }
 
-  func makeAppState(spy: DisplaySpy = DisplaySpy()) -> AppState {
+  /// Records what the pouring sound was asked to do, so tests stay silent.
+  @MainActor final class SoundSpy: SoundEffect {
+    var plays = 0
+    var stops = 0
+    func play() { plays += 1 }
+    func stop() { stops += 1 }
+  }
+
+  func makeAppState(spy: DisplaySpy = DisplaySpy(), sound: SoundSpy = SoundSpy()) -> AppState {
     AppState(
       defaults: defaults,
       sleepDisplay: {
         spy.calls += 1
         return spy.result
-      })
+      },
+      pourSound: sound)
   }
 
   @Test func activatingHoldsAssertionAndSchedulesTimer() {
@@ -347,6 +356,64 @@ struct AppStateTests {
     #expect(!state.isActive && state.transition == nil)
   }
 
+  // MARK: - Pouring sound
+
+  @Test func activatingPlaysThePouringSound() {
+    let sound = SoundSpy()
+    let state = makeAppState(sound: sound)
+    state.activate(spec: ActivationSpecs.oneHour.spec)
+    #expect(sound.plays == 1 && sound.stops == 0)
+  }
+
+  @Test func switchingDurationsPoursAgain() {
+    let sound = SoundSpy()
+    let state = makeAppState(sound: sound)
+    state.activate(spec: ActivationSpecs.oneHour.spec)
+    state.activate(spec: ActivationSpecs.twoHours.spec)
+    #expect(sound.plays == 2)
+  }
+
+  @Test func turningOffCutsThePouringSoundShort() {
+    let sound = SoundSpy()
+    let state = makeAppState(sound: sound)
+    state.activate(spec: ActivationSpecs.oneHour.spec)
+    state.turnOff()
+    #expect(sound.stops == 1)
+  }
+
+  @Test func activatingWithTheScreenAsleepPlaysNoSound() {
+    let sound = SoundSpy()
+    let state = makeAppState(sound: sound)
+    state.handleScreensDidSleep()
+    state.activate(spec: ActivationSpecs.oneHour.spec)
+    #expect(sound.plays == 0)
+  }
+
+  @Test func soundEffectsAreOnUnlessTurnedOff() {
+    #expect(makeAppState().isSoundEffectsEnabled)
+  }
+
+  @Test func withSoundEffectsOffActivatingIsSilent() {
+    let sound = SoundSpy()
+    let state = makeAppState(sound: sound)
+    state.setSoundEffects(false)
+    state.activate(spec: ActivationSpecs.oneHour.spec)
+    #expect(sound.plays == 0)
+  }
+
+  @Test func turningSoundEffectsOffSilencesAPourAtOnce() {
+    let sound = SoundSpy()
+    let state = makeAppState(sound: sound)
+    state.activate(spec: ActivationSpecs.oneHour.spec)
+    state.setSoundEffects(false)
+    #expect(sound.stops == 1)
+  }
+
+  @Test func theSoundEffectsChoiceIsRemembered() {
+    makeAppState().setSoundEffects(false)
+    #expect(!makeAppState().isSoundEffectsEnabled)  // a fresh start reads it back
+  }
+
   // MARK: - Steam preference
 
   @Test func steamHasThreeCurlsUnlessChosenOtherwise() {
@@ -365,62 +432,5 @@ struct AppStateTests {
   @Test func anUnknownSavedSteamChoiceFallsBackToThree() {
     defaults.set("seven", forKey: "SteamCurls")
     #expect(makeAppState().steamCurls == .three)
-  }
-
-  // MARK: - The open menu
-
-  /// A flag the menu's observation sets when anything it shows changes.
-  @MainActor final class Changed { var value = false }
-
-  func watchMenu(of state: AppState) -> Changed {
-    let changed = Changed()
-    let menu = MenuBarMenu(
-      appState: state, activate: { _ in }, turnOff: {}, toggleDisableAfterSuspend: {},
-      toggleLaunchAtLogin: {})
-    withObservationTracking {
-      _ = menu.body
-    } onChange: {
-      MainActor.assumeIsolated { changed.value = true }
-    }
-    return changed
-  }
-
-  @Test func theOpenMenuIsNotRebuiltOnEveryAnimationTick() async throws {
-    // SwiftUI rebuilds the open menu whenever something it shows changes; rebuilding it on every
-    // animation tick (20 times a second) made the Preferences submenu's hover highlight flicker.
-    let state = makeAppState()
-    state.activate(spec: ActivationSpecs.twoHours.spec)
-    try await Task.sleep(for: .seconds(1.5))  // past the start animation: only the steam moves
-    let changed = watchMenu(of: state)
-    try await Task.sleep(for: .milliseconds(300))  // several animation ticks
-    #expect(!changed.value)
-  }
-
-  @Test func minutesLeftAreRoundedUp() async throws {
-    let state = makeAppState()
-    #expect(state.minutesLeft == nil)
-    state.activate(spec: ActivationSpecs.twoHours.spec, now: Date() - 90)
-    #expect(state.minutesLeft == 120)  // as of when it started
-    try await Task.sleep(for: .milliseconds(200))  // the next tick sees 118.5 min to go
-    #expect(state.minutesLeft == 119)
-    state.deactivate()
-    #expect(state.minutesLeft == nil)
-  }
-
-  @Test func foreverHasNoMinutesLeft() {
-    let state = makeAppState()
-    state.activate(spec: ActivationSpecs.forever.spec)
-    #expect(state.minutesLeft == nil)
-  }
-
-  @Test func theOpenMenuStillUpdatesWhenTheMinuteChanges() async throws {
-    let state = makeAppState()
-    // Started 59.95 s ago: in a moment there are 119 minutes left, not 120.
-    state.activate(spec: ActivationSpecs.twoHours.spec, now: Date() - 59.95)
-    #expect(state.minutesLeft == 120)
-    let changed = watchMenu(of: state)
-    try await Task.sleep(for: .milliseconds(300))
-    #expect(changed.value)
-    #expect(state.minutesLeft == 119)
   }
 }

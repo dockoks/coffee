@@ -37,9 +37,10 @@ struct ActivationSpecsTests {
   }
 
   @Test(arguments: [
-    (1, "1 min"), (59, "59 min"), (60, "1 h"), (84, "1 h 24 min"), (120, "2 h"), (720, "12 h"),
+    (0.0, "0:00"), (0.2, "0:01"), (59, "0:59"), (60, "1:00"), (3599.5, "1:00:00"),
+    (3725, "1:02:05"), (5400, "1:30:00"), (43200, "12:00:00"),
   ])
-  func timeLeft(minutes: Int, expected: String) {
-    #expect(timeLeftText(minutes: minutes) == expected)
+  func countdownText(seconds: Double, expected: String) {
+    #expect(seconds.countdownText == expected)
   }
 }

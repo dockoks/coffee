@@ -70,6 +70,13 @@ struct CupIconTests {
     #expect(alpha(rep, x: 10, y: 12) < 0.1)
   }
 
+  @Test func aQuarterCupShowsAQuarterOfTheVisibleCoffee() {
+    // The visible coffee spans y 10.5...17 (inside the clear gap), so a quarter reaches y 15.4.
+    let rep = rasterize(CupIcon.image(level: 0.25, steam: .hidden))
+    #expect(alpha(rep, x: 10, y: 15.8) > 0.9)
+    #expect(alpha(rep, x: 10, y: 14.8) < 0.1)
+  }
+
   @Test func emptyCupStillHasItsOutline() {
     let rep = rasterize(CupIcon.image(level: 0, steam: .hidden))
     #expect(alpha(rep, x: 10, y: 16) < 0.1)
@@ -232,9 +239,9 @@ struct CupIconTests {
   }
 
   @Test func aTippedCupHoldsLess() {
-    #expect(abs(CupIcon.capacity(tilt: 0) - 1.19) < 0.03)
-    #expect(abs(CupIcon.capacity(tilt: 30) - 0.77) < 0.03)
-    #expect(abs(CupIcon.capacity(tilt: 60) - 0.31) < 0.03)
+    #expect(abs(CupIcon.capacity(tilt: 0) - 1.23) < 0.03)
+    #expect(abs(CupIcon.capacity(tilt: 30) - 0.713) < 0.03)
+    #expect(abs(CupIcon.capacity(tilt: 60) - 0.157) < 0.03)
     #expect(CupIcon.capacity(tilt: 90) < 0.02)
   }
 
@@ -250,7 +257,7 @@ struct CupIconTests {
     let rep = rasterize(CupIcon.image(level: 0.5, steam: .hidden, tilt: 30))
     // Below the surface both sides of the cup have coffee; above it neither does.
     #expect(alpha(rep, x: 7, y: 15.5) > 0.9 && alpha(rep, x: 12, y: 15.5) > 0.9)
-    #expect(alpha(rep, x: 7, y: 13.6) < 0.1 && alpha(rep, x: 12, y: 13.6) < 0.1)
+    #expect(alpha(rep, x: 7, y: 12.6) < 0.1 && alpha(rep, x: 12, y: 12.6) < 0.1)
   }
 
   @Test func tippingKeepsTheAmountOfCoffee() {

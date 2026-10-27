@@ -86,12 +86,15 @@ extension ActivationSpec {
   }
 }
 
-/// "1 h 24 min", "2 h" or "24 min".
-func timeLeftText(minutes: Int) -> String {
-  let (hours, rest) = (minutes / 60, minutes % 60)
-  switch (hours, rest) {
-  case (0, _): return "\(rest) min"
-  case (_, 0): return "\(hours) h"
-  default: return "\(hours) h \(rest) min"
+extension TimeInterval {
+  /// "1:02:05" for an hour or more, "4:30" below. Rounds up so a running countdown never shows 0:00.
+  var countdownText: String {
+    let total = Int(max(self, 0).rounded(.up))
+    let (hours, minutes, seconds) = (total / 3600, total % 3600 / 60, total % 60)
+    let secondsText = seconds < 10 ? "0\(seconds)" : "\(seconds)"
+    if hours > 0 {
+      return "\(hours):\(minutes < 10 ? "0" : "")\(minutes):\(secondsText)"
+    }
+    return "\(minutes):\(secondsText)"
   }
 }

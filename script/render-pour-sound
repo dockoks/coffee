@@ -1,0 +1,43 @@
+#!/usr/bin/env swift
+
+// Cuts the pouring sound down to the length of the pour animation and fades out its end, so it
+// dies away instead of stopping dead. Run from the repository root:
+//
+//   swift script/render-pour-sound
+
+import AVFoundation
+
+let source = "Sources/Sounds/dragon-studio-coffee-pouring-into-a-cup-467478.mp3"
+let output = "Sources/Sounds/pour.wav"
+let length: TimeInterval = 1.15
+let fadeOut: TimeInterval = 0.15
+
+let input = try AVAudioFile(forReading: URL(fileURLWithPath: source))
+let format = input.processingFormat
+let buffer = AVAudioPCMBuffer(
+  pcmFormat: format, frameCapacity: AVAudioFrameCount(length * format.sampleRate))!
+try input.read(into: buffer, frameCount: buffer.frameCapacity)
+
+// The volume eases down along a cosine, gently at first and last, reaching silence at the end.
+let count = Int(buffer.frameLength)
+let fadeFrames = Int(fadeOut * format.sampleRate)
+for channel in 0..<Int(format.channelCount) {
+  let samples = buffer.floatChannelData![channel]
+  for i in max(count - fadeFrames, 0)..<count {
+    let progress = Float(i - (count - fadeFrames) + 1) / Float(fadeFrames)
+    samples[i] *= 0.5 * (1 + cos(.pi * progress))
+  }
+}
+
+try? FileManager.default.removeItem(atPath: output)
+do {  // the file is only finished when it is released, at the end of this scope
+  let file = try AVAudioFile(
+    forWriting: URL(fileURLWithPath: output),
+    settings: [
+      AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: format.sampleRate,
+      AVNumberOfChannelsKey: format.channelCount, AVLinearPCMBitDepthKey: 16,
+      AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false,
+    ], commonFormat: format.commonFormat, interleaved: format.isInterleaved)
+  try file.write(from: buffer)
+}
+print("wrote \(output) (\(String(format: "%.2f", Double(count) / format.sampleRate)) s)")

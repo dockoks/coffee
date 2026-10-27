@@ -60,12 +60,14 @@ enum CupIcon {
     /// Spilled coffee falls to just past the bottom of the icon.
     static let spillBottom: CGFloat = 22.5
 
-    /// The liquid fills the bowl between these heights.
-    static let coffeeBottom: CGFloat = 18.5
-    static let coffeeTopWhenFull: CGFloat = 10.5
     static let outlineWidth: CGFloat = 1
     /// Clear space between the coffee and the outline, on each side.
     static let coffeeGap: CGFloat = 1
+    /// The level scale runs between these heights. The bottom is where the coffee starts to show,
+    /// above the bowl's floor by the outline and the gap; a lower one would waste the low levels
+    /// on coffee that the margin hides.
+    static let coffeeBottom: CGFloat = 18.5 - outlineWidth / 2 - coffeeGap
+    static let coffeeTopWhenFull: CGFloat = 10.5
   }
 
   /// - Parameters:
@@ -290,7 +292,7 @@ enum CupIcon {
   /// The upright level that holds `area` of coffee.
   private static func uprightLevel(holding area: Double) -> Double {
     let areas = Geometry.uprightAreas
-    guard area > 0 else { return 0 }
+    guard area > areas[0] else { return 0 }  // level 0 still has the sliver below the floor
     guard area < areas[areas.count - 1] else { return Geometry.rimLevel }
     let index = areas.firstIndex { $0 >= area }!
     let span = areas[index] - areas[index - 1]

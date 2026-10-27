@@ -29,13 +29,14 @@ the app blends smoothly from one keyframe to the next.
 
 ## Using It
 
-Pick a duration from the menu, from 15 minutes to 12 hours or Forever. While Coffee is brewing, the
+Pick a duration from the menu, from 15 minutes to 12 hours or Forever, and the cup fills with a
+pouring sound. While Coffee is brewing, the
 menu title counts down the time left, and the cup in the menu bar empties as time runs out.
 **Turn Off** (or clicking the active duration again) lets the Mac sleep again right away, and the
 cup tips over and spills. When the timer runs out, the coffee drains away instead.
 
 **Preferences → Steam** chooses between three steam curls (the default) and only the one in the
-middle.
+middle. **Preferences → Sound Effects** turns the pouring sound off.
 
 ## Saving Battery
 

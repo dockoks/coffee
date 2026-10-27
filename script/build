@@ -19,15 +19,19 @@ rm -rf "$APP_BUNDLE"
 mkdir -p "${APP_BUNDLE}/Contents/MacOS" "${APP_BUNDLE}/Contents/Resources"
 cp Bundle/Info.plist "${APP_BUNDLE}/Contents/"
 cp "${BUILD_DIR}/Coffee" "${APP_BUNDLE}/Contents/MacOS/"
+cp Sources/Sounds/pour.wav "${APP_BUNDLE}/Contents/Resources/Pour.wav"  # see script/render-pour-sound
 
-# Compile asset catalog
+# Compile asset catalog. actool reports to stdout and exits 0 even on failure, so keep its
+# warnings and errors but drop the list of files it wrote.
 xcrun actool \
+    --output-format human-readable-text \
     --compile "${APP_BUNDLE}/Contents/Resources" \
     --platform macosx \
     --minimum-deployment-target 14.0 \
     --app-icon AppIcon \
     --output-partial-info-plist /dev/null \
-    "${BUILD_DIR}/Coffee_Coffee.bundle/Assets.xcassets"
+    "${BUILD_DIR}/Coffee_Coffee.bundle/Assets.xcassets" |
+    awk '/^\/\* com\.apple\.actool\./ { show = !/compilation-results/ } show'
 
 # Codesign
 codesign --sign - --entitlements Bundle/Coffee.entitlements --force "$APP_BUNDLE"

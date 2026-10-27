@@ -218,8 +218,8 @@ struct CupTransitionTests {
   @Test func theStreamStartsAtTheLipAndFallsAway() throws {
     let starting = try #require(frame(spilling(), at: 0.2).spill)
     #expect(starting.start == 0 && starting.end > 0 && starting.end < 1)
-    #expect(frame(spilling(), at: 0.6).spill == CupSpill(start: 0, end: 1))
-    let leaving = try #require(frame(spilling(), at: 0.88).spill)
+    #expect(frame(spilling(), at: 0.45).spill == CupSpill(start: 0, end: 1))
+    let leaving = try #require(frame(spilling(), at: 0.6).spill)
     #expect(leaving.start > 0 && leaving.end == 1)
     #expect(frame(spilling(), at: 1.0).spill == nil)
   }
