@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+#
+# Publishes a signed, notarized Coffee-VERSION.dmg as a GitHub release:
+#
+#   ./script/release 1.0.0
+#
+# Needs, once per Mac:
+#   - a "Developer ID Application" certificate in the keychain (Xcode → Settings → Accounts)
+#   - notarization credentials saved under the profile name in NOTARY_PROFILE (default
+#     "coffee-notary"), using an app-specific password from account.apple.com:
+#       xcrun notarytool store-credentials coffee-notary --apple-id YOU@EXAMPLE.COM --team-id TEAMID
+#   - the GitHub CLI, signed in (gh auth login)
+#
+# DRY_RUN=1 builds, notarizes and checks the disk image but doesn't tag or publish.
+
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+TOP_LEVEL="$(cd "$HERE/../" && pwd)"
+
+cd "$TOP_LEVEL"
+
+VERSION="${1:?usage: script/release VERSION, for example script/release 1.0.0}"
+VERSION="${VERSION#v}"
+TAG="v${VERSION}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-coffee-notary}"
+DMG="deploy/Coffee-${VERSION}.dmg"
+
+if [[ -z "${DRY_RUN:-}" ]]; then
+    [[ -z "$(git status --porcelain)" ]] || { echo "Commit or stash your changes first." >&2; exit 1; }
+    ! git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || { echo "${TAG} already exists." >&2; exit 1; }
+fi
+
+IDENTITY="$(security find-identity -v -p codesigning | awk -F'"' '/Developer ID Application/ { print $2; exit }')"
+[[ -n "$IDENTITY" ]] || { echo "No Developer ID Application certificate in the keychain." >&2; exit 1; }
+echo "Signing as ${IDENTITY}"
+
+swift test
+VERSION="$VERSION" CODESIGN_IDENTITY="$IDENTITY" ./script/build
+
+# Disk image with the app and a shortcut to Applications, to drag it onto.
+rm -rf deploy
+mkdir -p deploy/dmg
+cp -R .build/release/Coffee.app deploy/dmg/
+ln -s /Applications deploy/dmg/Applications
+hdiutil create -quiet -volname "Coffee" -srcfolder deploy/dmg -fs HFS+ -format UDZO -ov "$DMG"
+rm -rf deploy/dmg
+codesign --sign "$IDENTITY" --timestamp "$DMG"
+
+# Notarize, so Gatekeeper opens it without warnings, and staple the ticket so that works offline.
+xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+xcrun stapler staple "$DMG"
+spctl --assess --type open --context context:primary-signature --verbose "$DMG"
+
+if [[ -n "${DRY_RUN:-}" ]]; then
+    echo "Dry run: ${DMG} is ready but not published."
+    exit 0
+fi
+
+git tag -a "$TAG" -m "Coffee ${VERSION}"
+git push origin "$TAG"
+gh release create "$TAG" "$DMG" --title "Coffee ${VERSION}" --generate-notes
+echo "Published https://github.com/dockoks/coffee/releases/tag/${TAG}"

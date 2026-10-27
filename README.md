@@ -8,10 +8,29 @@ _Keep your Mac awake, one cup at a time_
 
 --------------------------------------------------------------------------------
 
+## Install
+
+1. Download `Coffee-<version>.dmg` from the [latest release](https://github.com/dockoks/coffee/releases/latest).
+2. Open it and drag **Coffee** onto **Applications**.
+3. Open Coffee from Applications. A cup appears in the menu bar; the first time, Coffee offers
+   to open at login, so it is there after every restart. You can change that later with
+   **Launch at Login** in its menu, or in System Settings → General → Login Items.
+
+Coffee runs on macOS 14 Sonoma or later, on Apple silicon and Intel Macs. To update, choose
+**Check for Updates…** in its menu.
+
 ## Build
 
     ./script/build
     open .build/release/Coffee.app
+
+## Release
+
+    ./script/release 1.2.0
+
+builds the app for Apple silicon and Intel, signs it with your Developer ID, packs it in a
+disk image, has Apple notarize it, and publishes it as a GitHub release tagged `v1.2.0`. The
+comments at the top of [script/release](script/release) list the one-time setup.
 
 ## Features
 

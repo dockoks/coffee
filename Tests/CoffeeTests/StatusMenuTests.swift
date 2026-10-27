@@ -33,15 +33,24 @@ struct StatusMenuTests {
   /// Records what the menu asks the login item service to do, instead of registering for real.
   @MainActor final class LoginItemSpy {
     var requests: [Bool] = []
+    var enabled = false
     var fails = false
+    var errorsShown = 0
+
+    var loginItem: LoginItem {
+      LoginItem(
+        isEnabled: { self.enabled },
+        setEnabled: { enabled in
+          self.requests.append(enabled)
+          if self.fails { throw CocoaError(.featureUnsupported) }
+          self.enabled = enabled
+        })
+    }
   }
 
   func make(spy: LoginItemSpy = LoginItemSpy()) -> (AppState, StatusMenu) {
     let state = AppState(defaults: defaults, sleepDisplay: { true })
-    let menu = StatusMenu(appState: state) { enabled in
-      spy.requests.append(enabled)
-      if spy.fails { throw CocoaError(.featureUnsupported) }
-    }
+    let menu = StatusMenu(appState: state, loginItem: spy.loginItem) { _ in spy.errorsShown += 1 }
     return (state, menu)
   }
 
@@ -73,7 +82,8 @@ struct StatusMenuTests {
         "3 Hours", "4 Hours", "6 Hours", "8 Hours", "12 Hours", "—",
         "Turn Off", "Turn Off Screen Now", "—",
         "Preferences", "—",
-        "Launch at Login", "Quit Coffee",
+        "Launch at Login", "—",
+        "About Coffee", "Check for Updates…", "Quit Coffee",
       ])
     let preferences = item("Preferences", in: status.menu).submenu!
     #expect(
@@ -148,13 +158,24 @@ struct StatusMenuTests {
 
   @Test func launchAtLoginGoesThroughTheLoginItemService() {
     let spy = LoginItemSpy()
-    let (state, status) = make(spy: spy)
+    let (_, status) = make(spy: spy)
     press("Launch at Login", in: status.menu)
-    #expect(spy.requests == [true] && state.isLoginItemEnabled)
+    #expect(spy.requests == [true] && spy.enabled)
     #expect(item("Launch at Login", in: status.menu).state == .on)
     spy.fails = true
     press("Launch at Login", in: status.menu)
-    #expect(spy.requests == [true, false] && state.isLoginItemEnabled)  // unchanged when it fails
+    #expect(spy.requests == [true, false] && spy.enabled)  // unchanged when it fails
+    #expect(spy.errorsShown == 1)
+    #expect(item("Launch at Login", in: status.menu).state == .on)
+  }
+
+  @Test func launchAtLoginFollowsSystemSettings() {
+    let spy = LoginItemSpy()
+    let (_, status) = make(spy: spy)
+    #expect(item("Launch at Login", in: status.menu).state == .off)
+    spy.enabled = true  // switched on in System Settings → Login Items
+    status.refresh()
+    #expect(item("Launch at Login", in: status.menu).state == .on)
   }
 
   // MARK: - The countdown, by the second, without disturbing the rest of the menu

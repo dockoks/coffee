@@ -16,7 +16,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import AppKit
-import ServiceManagement
 import os
 
 /// The menu bar item: the animated cup and its menu.
@@ -30,7 +29,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   let menu = NSMenu()
 
   private let appState: AppState
-  private let setLoginItem: @MainActor (Bool) throws -> Void
+  private let loginItem: LoginItem
+  private let presentError: @MainActor (Error) -> Void
   private var statusItem: NSStatusItem?
   private var countdownTimer: Timer?
 
@@ -44,13 +44,15 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   private var disableAfterSuspendItem = NSMenuItem()
   private var launchAtLoginItem = NSMenuItem()
 
-  /// - Parameter setLoginItem: Registers or unregisters Coffee as a login item.
+  /// - Parameter presentError: Tells the person why the login item couldn't be changed.
   init(
     appState: AppState,
-    setLoginItem: @escaping @MainActor (Bool) throws -> Void = StatusMenu.registerLoginItem
+    loginItem: LoginItem = .system,
+    presentError: @escaping @MainActor (Error) -> Void = StatusMenu.showLoginItemError
   ) {
     self.appState = appState
-    self.setLoginItem = setLoginItem
+    self.loginItem = loginItem
+    self.presentError = presentError
     super.init()
     buildMenu()
     menu.delegate = self
@@ -110,6 +112,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     launchAtLoginItem = action("Launch at Login", #selector(toggleLaunchAtLogin))
     menu.addItem(launchAtLoginItem)
+    menu.addItem(.separator())
+    menu.addItem(action("About Coffee", #selector(showAbout)))
+    menu.addItem(action("Check for Updates…", #selector(checkForUpdates)))
     menu.addItem(action("Quit Coffee", #selector(quit), key: "q", modifiers: .command))
   }
 
@@ -141,7 +146,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     set(soundEffectsItem, on: appState.isSoundEffectsEnabled)
     set(keepScreenOnItem, on: appState.isKeepScreenOnEnabled)
     set(disableAfterSuspendItem, on: appState.isDisableAfterSuspendEnabled)
-    set(launchAtLoginItem, on: appState.isLoginItemEnabled)
+    set(launchAtLoginItem, on: loginItem.isEnabled())
   }
 
   private func headerText(at now: Date) -> String {
@@ -240,27 +245,45 @@ final class StatusMenu: NSObject, NSMenuDelegate {
   }
 
   @objc private func toggleLaunchAtLogin() {
-    let newState = !appState.isLoginItemEnabled
+    let newState = !loginItem.isEnabled()
     do {
-      try setLoginItem(newState)
+      try loginItem.setEnabled(newState)
+      os_log("Launch at login: %{public}s", newState ? "enabled" : "disabled")
     } catch {
       os_log("Failed to update login item: %{public}@", error.localizedDescription)
-      return
+      presentError(error)
     }
-    appState.setLoginItemEnabled(newState)
-    os_log("Launch at login: %{public}s", newState ? "enabled" : "disabled")
     refresh()
+  }
+
+  @objc private func showAbout() {
+    NSApp.activate()
+    NSApp.orderFrontStandardAboutPanel(options: [
+      .credits: NSAttributedString(
+        string: "github.com/dockoks/coffee",
+        attributes: [
+          .link: URL(string: "https://github.com/dockoks/coffee")!,
+          .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+        ])
+    ])
+  }
+
+  @objc private func checkForUpdates() {
+    Task { await Updates.check() }
   }
 
   @objc private func quit() {
     NSApplication.shared.terminate(nil)
   }
 
-  static func registerLoginItem(_ enabled: Bool) throws {
-    if enabled {
-      try SMAppService.mainApp.register()
-    } else {
-      try SMAppService.mainApp.unregister()
-    }
+  static func showLoginItemError(_ error: Error) {
+    let alert = NSAlert()
+    alert.messageText = "Coffee can’t open at login"
+    alert.informativeText =
+      Welcome.isTemporaryLocation(Bundle.main.bundleURL)
+      ? "Move Coffee into the Applications folder and open it from there, then try again."
+      : error.localizedDescription
+    NSApp.activate()
+    alert.runModal()
   }
 }

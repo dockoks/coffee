@@ -37,5 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let menu = StatusMenu(appState: state)
     menu.install()
     statusMenu = menu
+    // After the cup is in the menu bar, so the welcome can point at it.
+    DispatchQueue.main.async { Welcome.showIfNeeded() }
   }
 }

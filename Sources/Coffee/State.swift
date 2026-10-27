@@ -24,7 +24,6 @@ import os
 final class AppState {
   private enum DefaultsKey {
     static let disableAfterSuspend = "DisableAfterSuspend"
-    static let loginItemEnabled = "LoginItemEnabled"
     static let keepScreenOn = "KeepScreenOn"
     static let steamCurls = "SteamCurls"
     static let soundEffects = "SoundEffects"
@@ -34,7 +33,6 @@ final class AppState {
   private(set) var activeSpec: ActivationSpec? = nil
   private(set) var activatedAt: Date? = nil
   private(set) var isDisableAfterSuspendEnabled: Bool = false
-  private(set) var isLoginItemEnabled: Bool = false
   /// Whether brewing also keeps the screen on. When off, the Mac stays awake but the screen may turn off.
   private(set) var isKeepScreenOnEnabled: Bool = true
   /// How many steam curls the menu bar cup shows.
@@ -81,7 +79,6 @@ final class AppState {
     steamCurls = defaults.string(forKey: DefaultsKey.steamCurls).flatMap(SteamCurls.init) ?? .three
     isSoundEffectsEnabled = defaults.object(forKey: DefaultsKey.soundEffects) as? Bool ?? true
     isDisableAfterSuspendEnabled = defaults.bool(forKey: DefaultsKey.disableAfterSuspend)
-    isLoginItemEnabled = defaults.bool(forKey: DefaultsKey.loginItemEnabled)
   }
 
   // MARK: - Activation
@@ -298,10 +295,5 @@ final class AppState {
   func setDisableAfterSuspend(_ enabled: Bool) {
     defaults.set(enabled, forKey: DefaultsKey.disableAfterSuspend)
     isDisableAfterSuspendEnabled = enabled
-  }
-
-  func setLoginItemEnabled(_ enabled: Bool) {
-    defaults.set(enabled, forKey: DefaultsKey.loginItemEnabled)
-    isLoginItemEnabled = enabled
   }
 }
